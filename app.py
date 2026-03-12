@@ -75,16 +75,16 @@ if uploaded_file and api_key:
                 # إنشاء ملف الوورد
                 word_data = create_word_file(full_text)
                 if final_text:
-    # نقوم باستدعاء الدالة وحفظ النتيجة في متغير
-    doc_download = create_word_file(final_text)
+              # نقوم باستدعاء الدالة وحفظ النتيجة في متغير
+                 doc_download = create_word_file(final_text)
     
-    # نظهر الزر للمستخدم
-    st.download_button(
+               # نظهر الزر للمستخدم
+                 st.download_button(
         label="📥 تحميل النص كملف Word",
         data=doc_download,
         file_name="mistral_ocr_result.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
+                                                                                      )
             st.success("تمت العملية بنجاح! 🎉")
 
             # عرض النص في التطبيق للمعاينة
