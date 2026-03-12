@@ -64,7 +64,7 @@ if uploaded_file and api_key:
                 st.write("🔄 يتم الآن قراءة النص بالذكاء الاصطناعي عبر Mistral OCR...")
                 
                 # استدعاء الـ API باستخدام الهيكل الصحيح للإصدارات الحديثة
-                ocr_response = client.ocr.process(
+                ocr_response = client.ocr (
                     model="mistral-ocr-latest",
                     document={
                         "type": "document_url",
