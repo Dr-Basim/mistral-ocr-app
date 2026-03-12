@@ -1,3 +1,1 @@
-streamlit
-mistralai
-python-docx
+mistralai==1.5.0
