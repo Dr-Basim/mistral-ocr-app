@@ -46,7 +46,7 @@ api_key = st.secrets["MISTRAL_API_KEY"]
 # تعريف العميل باستخدام المفتاح
 client = Mistral(api_key=api_key)
 
-    uploaded_file = st.file_uploader("اختر ملف PDF", type=["pdf"])
+uploaded_file = st.file_uploader("اختر ملف PDF", type=["pdf"])
 
 if uploaded_file and api_key:
     if st.button("ابدأ عملية الاستخراج والتنسيق ✨"):
