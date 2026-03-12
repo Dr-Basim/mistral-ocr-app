@@ -62,9 +62,10 @@ if uploaded_file and api_key:
                 encoded_pdf = base64.b64encode(file_bytes).decode("utf-8")
 
                 st.write("🔄 يتم الآن قراءة النص بالذكاء الاصطناعي عبر Mistral OCR...")
-                
+                st.write("الأدوات المتاحة داخل العميل حالياً:", dir(client))
+
                 # استدعاء الـ API باستخدام الهيكل الصحيح للإصدارات الحديثة
-                ocr_response = client.ocr (
+                ocr_response = client.ocr.response (
                     model="mistral-ocr-latest",
                     document={
                         "type": "document_url",
