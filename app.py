@@ -1,24 +1,27 @@
 import streamlit as st
-import mistralai
-import pkg_resources
-
-# طباعة الإصدار الفعلي للتأكد
-try:
-    version = pkg_resources.get_distribution("mistralai").version
-    st.write(f"📦 إصدار المكتبة المثبت حالياً هو: {version}")
-except:
-    st.write("❌ تعذر تحديد إصدار المكتبة")
-
-from mistralai import Mistral
-# ... باقي الكود
-
-import streamlit as st
 import base64
 import re
 import io
 from mistralai import Mistral
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+import streamlit as st
+import base64
+import re
+import io
+import importlib.metadata  # المكتبة الحديثة للكشف عن النسخ
+from mistralai import Mistral
+from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+# --- اختبار نسخة المكتبة ---
+try:
+    current_version = importlib.metadata.version("mistralai")
+    st.info(f"📦 نسخة المكتبة المكتشفة الآن: {current_version}")
+except Exception:
+    st.warning("⚠️ لم يتم العثور على مكتبة mistralai في هذه البيئة.")
+
+# ... باقي الكود (دالة تنظيف النص، إلخ)
 
 # --- 1. دالة تنظيف النص وتنظيمه ---
 def clean_and_format_text(ocr_pages):
