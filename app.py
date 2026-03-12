@@ -27,7 +27,7 @@ def create_word_file(text):
 
     for line in text.split('\n'):
         p = doc.add_paragraph(line)
-        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT # محاذاة لليمين
+        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT  # محاذاة لليمين
 
     # حفظ الملف في ذاكرة مؤقتة (Buffer) لتحميله عبر المتصفح
     bio = io.BytesIO()
@@ -71,20 +71,21 @@ if uploaded_file and api_key:
                 # تنظيف وتنسيق النص
                 st.write("🧹 جاري تنظيف وتنسيق النص العربي...")
                 full_text = clean_and_format_text(ocr_response.pages)
-               
+
                 # إنشاء ملف الوورد
                 word_data = create_word_file(full_text)
-                if final_text:
-              # نقوم باستدعاء الدالة وحفظ النتيجة في متغير
-                 doc_download = create_word_file(final_text)
-    
-               # نظهر الزر للمستخدم
-                 st.download_button(
-        label="📥 تحميل النص كملف Word",
-        data=doc_download,
-        file_name="mistral_ocr_result.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                                                                                      )
+
+                # الإضافة الجديدة في موضعها الصحيح
+                st.text_area("النص المستخرج:", full_text, height=300)
+
+                if full_text.strip():
+                    st.download_button(
+                        label="📥 تحميل النص كملف Word",
+                        data=word_data,
+                        file_name="mistral_ocr_result.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+
             st.success("تمت العملية بنجاح! 🎉")
 
             # عرض النص في التطبيق للمعاينة
