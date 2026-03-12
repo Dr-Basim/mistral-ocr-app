@@ -9,68 +9,30 @@ from docx.shared import Pt
 
 # --- 1. دالة تنظيف النص وتنظيمه ---
 def clean_and_format_text(ocr_pages):
-    final_parts = []
+    final_text = ""
 
     for i, page in enumerate(ocr_pages):
         text = page.markdown
 
-        # توحيد أشكال الأسطر والمسافات
+        # توحيد الأسطر والمسافات دون مبالغة
         text = text.replace('\r\n', '\n').replace('\r', '\n')
         text = re.sub(r'[ \t]+', ' ', text)
         text = re.sub(r'\n{3,}', '\n\n', text).strip()
 
-        lines = [line.strip() for line in text.split('\n')]
-        merged_lines = []
-        current_paragraph = ""
+        # إضافة فاصل صفحات واضح
+        page_header = f"\n\n--- صفحة {i+1} ---\n\n"
+        final_text += page_header + text
 
-        for line in lines:
-            if not line:
-                if current_paragraph:
-                    merged_lines.append(current_paragraph.strip())
-                    current_paragraph = ""
-                merged_lines.append("")
-                continue
-
-            # اعتبار بعض السطور عناوين مستقلة
-            is_heading = (
-                len(line) <= 60 or
-                re.match(r'^(الفصل|الباب|المبحث|المطلب|المسألة|الدرس|المحاضرة|عنوان)', line) or
-                re.match(r'^\d+[\-\.\)]\s*', line)
-            )
-
-            if is_heading:
-                if current_paragraph:
-                    merged_lines.append(current_paragraph.strip())
-                    current_paragraph = ""
-                merged_lines.append(line)
-                continue
-
-            # دمج السطور التي تنتمي للفقرة نفسها
-            if current_paragraph:
-                current_paragraph += " " + line
-            else:
-                current_paragraph = line
-
-        if current_paragraph:
-            merged_lines.append(current_paragraph.strip())
-
-        page_header = f"--- صفحة {i+1} ---"
-        final_parts.append(page_header)
-        final_parts.extend(merged_lines)
-        final_parts.append("")
-
-    final_text = "\n".join(final_parts)
-    final_text = re.sub(r'\n{3,}', '\n\n', final_text).strip()
-    return final_text
+    return final_text.strip()
 
 # --- 2. دالة إنشاء ملف الوورد ---
 def create_word_file(text):
     doc = Document()
 
-    # تنسيق النمط الأساسي
+    # النمط الأساسي
     style = doc.styles['Normal']
     style.font.name = 'Arial'
-    style.font.size = Pt(15)
+    style.font.size = Pt(14)
 
     lines = text.split('\n')
 
@@ -85,41 +47,37 @@ def create_word_file(text):
         if re.match(r'^--- صفحة \d+ ---$', stripped):
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.space_after = Pt(6)
             run = p.add_run(stripped)
             run.bold = True
-            run.font.size = Pt(16)
+            run.font.size = Pt(14)
             continue
 
-        # عنوان رئيسي
-        if (
-            len(stripped) <= 40 and
+        # عنوان رئيسي أو فرعي محتمل
+        is_heading = (
+            len(stripped) <= 50 and
             not stripped.endswith('،') and
             not stripped.endswith('.') and
-            not re.match(r'^\d+[\-\.\)]', stripped)
-        ):
-            p = doc.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            run = p.add_run(stripped)
-            run.bold = True
-            run.font.size = Pt(17)
-            continue
+            not stripped.endswith(':') and
+            not re.match(r'^\d+\s*$', stripped)
+        ) or re.match(r'^(الفصل|الباب|المبحث|المطلب|المسألة|الدرس|المحاضرة|عنوان)', stripped)
 
-        # عنوان فرعي أو تعداد
-        if re.match(r'^(الفصل|الباب|المبحث|المطلب|المسألة|الدرس|المحاضرة|عنوان|\d+[\-\.\)])', stripped):
+        if is_heading:
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            p.paragraph_format.space_after = Pt(3)
             run = p.add_run(stripped)
             run.bold = True
             run.font.size = Pt(15)
             continue
 
-        # فقرة عادية
+        # فقرة عادية بتنسيق خفيف
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        p.paragraph_format.space_after = Pt(6)
-        p.paragraph_format.line_spacing = 1.5
+        p.paragraph_format.space_after = Pt(2)
+        p.paragraph_format.line_spacing = 1.15
         run = p.add_run(stripped)
-        run.font.size = Pt(15)
+        run.font.size = Pt(14)
 
     bio = io.BytesIO()
     doc.save(bio)
