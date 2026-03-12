@@ -40,7 +40,12 @@ st.title("معالج الكتب العربي الذكي 🤖📖")
 
 with st.sidebar:
     st.header("الإعدادات")
-    api_key = st.text_input("أدخل مفتاح Mistral API", type="password")
+    # إحضار المفتاح من الخزنة السرية
+api_key = st.secrets["MISTRAL_API_KEY"]
+
+# تعريف العميل باستخدام المفتاح
+client = Mistral(api_key=api_key)
+
     uploaded_file = st.file_uploader("اختر ملف PDF", type=["pdf"])
 
 if uploaded_file and api_key:
