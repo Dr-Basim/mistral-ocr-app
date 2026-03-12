@@ -1,4 +1,18 @@
 import streamlit as st
+import mistralai
+import pkg_resources
+
+# طباعة الإصدار الفعلي للتأكد
+try:
+    version = pkg_resources.get_distribution("mistralai").version
+    st.write(f"📦 إصدار المكتبة المثبت حالياً هو: {version}")
+except:
+    st.write("❌ تعذر تحديد إصدار المكتبة")
+
+from mistralai import Mistral
+# ... باقي الكود
+
+import streamlit as st
 import base64
 import re
 import io
