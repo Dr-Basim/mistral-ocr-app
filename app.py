@@ -27,7 +27,7 @@ def create_word_file(text):
 
     for line in text.split('\n'):
         p = doc.add_paragraph(line)
-        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT  # محاذاة لليمين
+        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT # محاذاة لليمين
 
     # حفظ الملف في ذاكرة مؤقتة (Buffer) لتحميله عبر المتصفح
     bio = io.BytesIO()
@@ -40,58 +40,56 @@ st.title("معالج الكتب العربي الذكي 🤖📖")
 
 with st.sidebar:
     st.header("الإعدادات")
-
 # 1. جلب المفتاح بأمان من الخزنة
 api_key = st.secrets["MISTRAL_API_KEY"]
 client = Mistral(api_key=api_key)
 
 # 2. إرسال الطلب ومعالجة النتيجة (الربط)
 if uploaded_file is not None:
-    try:
-        with st.spinner("جاري قراءة النص وتحليله... ⏳"):
-            # نقوم برفع الملف ومعالجته عبر API
-            ocr_response = client.ocr(
-                model="mistral-ocr-latest",
-                document={"type": "file", "file": uploaded_file}
+    with st.spinner("جاري قراءة النص وتحليله... ⏳"):
+        # نقوم برفع الملف ومعالجته عبر API
+        ocr_response = client.ocr(
+            model="mistral-ocr-latest",
+            document={"type": "file", "file": uploaded_file}
+        )
+        
+        # 3. معالجة النص وعرضه
+        full_text = clean_and_format_text(ocr_response.pages)
+        st.text_area("النص المستخرج:", full_text, height=300)
+
+        # 4. تحويل النص لملف Word وإظهار زر التحميل (التحسين)
+        if full_text.strip():
+            word_data = create_word_file(full_text)
+            st.download_button(
+                label="📥 تحميل النص كملف Word",
+                data=word_data,
+                file_name="mistral_ocr_result.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
-            # 3. معالجة النص وعرضه
-            full_text = clean_and_format_text(ocr_response.pages)
-            st.text_area("النص المستخرج:", full_text, height=300)
+            st.success("تمت العملية بنجاح! 🎉")
 
-            # 4. تحويل النص لملف Word وإظهار زر التحميل (التحسين)
-            if full_text.strip():
-                word_data = create_word_file(full_text)
+            # عرض النص في التطبيق للمعاينة
+            st.text_area("معاينة النص المستخرج:", full_text, height=300)
+
+            # أزرار التحميل
+            col1, col2 = st.columns(2)
+            with col1:
                 st.download_button(
-                    label="📥 تحميل النص كملف Word",
+                    label="تحميل كملف Word 📄",
                     data=word_data,
-                    file_name="mistral_ocr_result.docx",
+                    file_name="extracted_book.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
+            with col2:
+                st.download_button(
+                    label="تحميل كملف نصي Text 📝",
+                    data=full_text,
+                    file_name="extracted_book.txt",
+                    mime="text/plain"
+                )
 
-                st.success("تمت العملية بنجاح! 🎉")
-
-                # عرض النص في التطبيق للمعاينة
-                st.text_area("معاينة النص المستخرج:", full_text, height=300)
-
-                # أزرار التحميل
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.download_button(
-                        label="تحميل كملف Word 📄",
-                        data=word_data,
-                        file_name="extracted_book.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-                with col2:
-                    st.download_button(
-                        label="تحميل كملف نصي Text 📝",
-                        data=full_text,
-                        file_name="extracted_book.txt",
-                        mime="text/plain"
-                    )
-
-    except Exception as e:
-        st.error(f"حدث خطأ: {e}")
-else:
+              except Exception as e:
+            st.error(f"حدث خطأ: {e}")
+          else:
     st.info("يرجى إدخال مفتاح API ورفع ملف للبدء.")
