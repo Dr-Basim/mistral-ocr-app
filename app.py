@@ -5,50 +5,122 @@ import io
 from mistralai import Mistral
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-import streamlit as st
-import base64
-import re
-import io
-import importlib.metadata  # المكتبة الحديثة للكشف عن النسخ
-from mistralai import Mistral
-from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-
-# --- اختبار نسخة المكتبة ---
-try:
-    current_version = importlib.metadata.version("mistralai")
-    st.info(f"📦 نسخة المكتبة المكتشفة الآن: {current_version}")
-except Exception:
-    st.warning("⚠️ لم يتم العثور على مكتبة mistralai في هذه البيئة.")
-
-# ... باقي الكود (دالة تنظيف النص، إلخ)
+from docx.shared import Pt
 
 # --- 1. دالة تنظيف النص وتنظيمه ---
 def clean_and_format_text(ocr_pages):
-    final_text = ""
+    final_parts = []
+
     for i, page in enumerate(ocr_pages):
-        # استخراج النص من خاصية markdown المتوفرة في استجابة ميسترال
         text = page.markdown
-        # إزالة المسافات الزائدة (أكثر من مسافتين)
-        text = re.sub(r'\s{2,}', ' ', text)
-        # إضافة فاصل صفحات واضح لترتيب المستند
-        page_header = f"\n\n--- صفحة {i+1} ---\n\n"
-        final_text += page_header + text
+
+        # توحيد أشكال الأسطر والمسافات
+        text = text.replace('\r\n', '\n').replace('\r', '\n')
+        text = re.sub(r'[ \t]+', ' ', text)
+        text = re.sub(r'\n{3,}', '\n\n', text).strip()
+
+        lines = [line.strip() for line in text.split('\n')]
+        merged_lines = []
+        current_paragraph = ""
+
+        for line in lines:
+            if not line:
+                if current_paragraph:
+                    merged_lines.append(current_paragraph.strip())
+                    current_paragraph = ""
+                merged_lines.append("")
+                continue
+
+            # اعتبار بعض السطور عناوين مستقلة
+            is_heading = (
+                len(line) <= 60 or
+                re.match(r'^(الفصل|الباب|المبحث|المطلب|المسألة|الدرس|المحاضرة|عنوان)', line) or
+                re.match(r'^\d+[\-\.\)]\s*', line)
+            )
+
+            if is_heading:
+                if current_paragraph:
+                    merged_lines.append(current_paragraph.strip())
+                    current_paragraph = ""
+                merged_lines.append(line)
+                continue
+
+            # دمج السطور التي تنتمي للفقرة نفسها
+            if current_paragraph:
+                current_paragraph += " " + line
+            else:
+                current_paragraph = line
+
+        if current_paragraph:
+            merged_lines.append(current_paragraph.strip())
+
+        page_header = f"--- صفحة {i+1} ---"
+        final_parts.append(page_header)
+        final_parts.extend(merged_lines)
+        final_parts.append("")
+
+    final_text = "\n".join(final_parts)
+    final_text = re.sub(r'\n{3,}', '\n\n', final_text).strip()
     return final_text
 
 # --- 2. دالة إنشاء ملف الوورد ---
 def create_word_file(text):
     doc = Document()
-    # إعداد النمط الافتراضي ليدعم اللغة العربية
+
+    # تنسيق النمط الأساسي
     style = doc.styles['Normal']
     style.font.name = 'Arial'
+    style.font.size = Pt(15)
 
-    for line in text.split('\n'):
-        if line.strip(): # تجنب إضافة أسطر فارغة بلا داعي
-            p = doc.add_paragraph(line)
-            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT  # محاذاة النص لليمين
-    
-    # حفظ الملف في ذاكرة مؤقتة (Buffer)
+    lines = text.split('\n')
+
+    for line in lines:
+        stripped = line.strip()
+
+        if not stripped:
+            doc.add_paragraph("")
+            continue
+
+        # عنوان الصفحة
+        if re.match(r'^--- صفحة \d+ ---$', stripped):
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run(stripped)
+            run.bold = True
+            run.font.size = Pt(16)
+            continue
+
+        # عنوان رئيسي
+        if (
+            len(stripped) <= 40 and
+            not stripped.endswith('،') and
+            not stripped.endswith('.') and
+            not re.match(r'^\d+[\-\.\)]', stripped)
+        ):
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            run = p.add_run(stripped)
+            run.bold = True
+            run.font.size = Pt(17)
+            continue
+
+        # عنوان فرعي أو تعداد
+        if re.match(r'^(الفصل|الباب|المبحث|المطلب|المسألة|الدرس|المحاضرة|عنوان|\d+[\-\.\)])', stripped):
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            run = p.add_run(stripped)
+            run.bold = True
+            run.font.size = Pt(15)
+            continue
+
+        # فقرة عادية
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        p.paragraph_format.space_after = Pt(6)
+        p.paragraph_format.line_spacing = 1.5
+        run = p.add_run(stripped)
+        run.font.size = Pt(15)
+
     bio = io.BytesIO()
     doc.save(bio)
     return bio.getvalue()
@@ -57,52 +129,61 @@ def create_word_file(text):
 st.set_page_config(page_title="معالج الكتب الذكي", page_icon="📚")
 st.title("معالج الكتب العربي الذكي 🤖📖")
 
-# جلب المفتاح من الخزنة السرية (Secrets) الخاصة بـ Streamlit
-try:
-    api_key = st.secrets["MISTRAL_API_KEY"]
-except Exception:
-    api_key = None
-    st.error("لم يتم العثور على مفتاح MISTRAL_API_KEY في الإعدادات.")
+with st.sidebar:
+    st.header("الإعدادات")
+    # إحضار المفتاح من الخزنة السرية
+api_key = st.secrets["MISTRAL_API_KEY"]
 
-# تعريف العميل (Client)
-if api_key:
-    client = Mistral(api_key=api_key)
+# تعريف العميل باستخدام المفتاح
+client = Mistral(api_key=api_key)
 
 uploaded_file = st.file_uploader("اختر ملف PDF", type=["pdf"])
 
 if uploaded_file and api_key:
     if st.button("ابدأ عملية الاستخراج والتنسيق ✨"):
         try:
+            client = Mistral(api_key=api_key)
+
             with st.status("جاري معالجة الكتاب..."):
-                # تحويل الملف المرفوع إلى Base64 ليتم إرساله عبر الرابط الافتراضي (Data URL)
+                # تحويل الملف إلى Base64
                 file_bytes = uploaded_file.read()
                 encoded_pdf = base64.b64encode(file_bytes).decode("utf-8")
 
-                st.write("🔄 يتم الآن قراءة النص بالذكاء الاصطناعي عبر Mistral OCR...")
-                st.write("الأدوات المتاحة داخل العميل حالياً:", dir(client))
-
-                # الاستدعاء الصحيح للنسخة 1.5.0 وما فوق
+                # طلب الاستخراج من Mistral
+                st.write("🔄 يتم الآن قراءة النص بالذكاء الاصطناعي...")
                 ocr_response = client.ocr.process(
-                 model="mistral-ocr-latest",
-                  document={
-                  "type": "document_url",
-                  "document_url": f"data:application/pdf;base64,{encoded_pdf}"
-                  }
-                   )
+                    model="mistral-ocr-latest",
+                    document={
+                        "type": "document_url",
+                        "document_url": f"data:application/pdf;base64,{encoded_pdf}"
+                    }
+                )
 
-                st.write("🧹 جاري تنظيف وتنسيق النص العربي المستخرج...")
+                # تنظيف وتنسيق النص
+                st.write("🧹 جاري تنظيف وتنسيق النص العربي...")
                 full_text = clean_and_format_text(ocr_response.pages)
-                
-                # تحويل النص النهائي إلى بيانات ملف Word
+
+                # إنشاء ملف الوورد
                 word_data = create_word_file(full_text)
 
-            # --- عرض النتائج وأزرار التحميل ---
-            st.success("تمت المعالجة بنجاح! 🎉")
-            
-            # معاينة النص في منطقة نصية قابلة للنسخ
-            st.text_area("معاينة النص المستخرج:", full_text, height=400)
+                # عرض النص المستخرج
+                st.text_area("النص المستخرج:", full_text, height=300)
 
-            # توزيع أزرار التحميل في أعمدة لتنظيم الواجهة
+                # زر التحميل الأول
+                if full_text.strip():
+                    st.download_button(
+                        label="📥 تحميل النص كملف Word",
+                        data=word_data,
+                        file_name="mistral_ocr_result.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+
+            st.success("تمت العملية بنجاح! 🎉")
+
+            # عرض النص في التطبيق للمعاينة
+            st.text_area("معاينة النص المستخرج:", full_text, height=300)
+
+            # أزرار التحميل
             col1, col2 = st.columns(2)
             with col1:
                 st.download_button(
@@ -120,10 +201,6 @@ if uploaded_file and api_key:
                 )
 
         except Exception as e:
-            st.error(f"حدث خطأ أثناء الاتصال بالخادم: {e}")
-            st.info("تأكد من تحديث مكتبة mistralai في ملف requirements.txt إلى الإصدار 1.4.0 أو أحدث.")
+            st.error(f"حدث خطأ: {e}")
 else:
-    if not api_key:
-        st.warning("يرجى التأكد من إضافة مفتاح API في خزنة الأسرار.")
-    else:
-        st.info("يرجى رفع ملف PDF للبدء في الاستخراج.")
+    st.info("يرجى إدخال مفتاح API ورفع ملف للبدء.")
