@@ -81,14 +81,14 @@ if uploaded_file and api_key:
                 st.write("🔄 يتم الآن قراءة النص بالذكاء الاصطناعي عبر Mistral OCR...")
                 st.write("الأدوات المتاحة داخل العميل حالياً:", dir(client))
 
-                # استدعاء الـ API باستخدام الهيكل الصحيح للإصدارات الحديثة
-                ocr_response = client.ocr.response (
-                    model="mistral-ocr-latest",
-                    document={
-                        "type": "document_url",
-                        "document_url": f"data:application/pdf;base64,{encoded_pdf}"
-                    }
-                )
+                # الاستدعاء الصحيح للنسخة 1.5.0 وما فوق
+                ocr_response = client.ocr.process(
+                 model="mistral-ocr-latest",
+                  document={
+                  "type": "document_url",
+                  "document_url": f"data:application/pdf;base64,{encoded_pdf}"
+                  }
+                   )
 
                 st.write("🧹 جاري تنظيف وتنسيق النص العربي المستخرج...")
                 full_text = clean_and_format_text(ocr_response.pages)
