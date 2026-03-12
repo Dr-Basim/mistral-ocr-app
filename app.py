@@ -40,33 +40,51 @@ st.title("معالج الكتب العربي الذكي 🤖📖")
 
 with st.sidebar:
     st.header("الإعدادات")
-# 1. جلب المفتاح بأمان من الخزنة
+    # إحضار المفتاح من الخزنة السرية
 api_key = st.secrets["MISTRAL_API_KEY"]
+
+# تعريف العميل باستخدام المفتاح
 client = Mistral(api_key=api_key)
 
-# 2. إرسال الطلب ومعالجة النتيجة (الربط)
-if uploaded_file is not None:
-    with st.spinner("جاري قراءة النص وتحليله... ⏳"):
-        # نقوم برفع الملف ومعالجته عبر API
-        ocr_response = client.ocr(
-            model="mistral-ocr-latest",
-            document={"type": "file", "file": uploaded_file}
-        )
-        
-        # 3. معالجة النص وعرضه
-        full_text = clean_and_format_text(ocr_response.pages)
-        st.text_area("النص المستخرج:", full_text, height=300)
+uploaded_file = st.file_uploader("اختر ملف PDF", type=["pdf"])
 
-        # 4. تحويل النص لملف Word وإظهار زر التحميل (التحسين)
-        if full_text.strip():
-            word_data = create_word_file(full_text)
-            st.download_button(
-                label="📥 تحميل النص كملف Word",
-                data=word_data,
-                file_name="mistral_ocr_result.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
+if uploaded_file and api_key:
+    if st.button("ابدأ عملية الاستخراج والتنسيق ✨"):
+        try:
+            client = Mistral(api_key=api_key)
 
+            with st.status("جاري معالجة الكتاب..."):
+                # تحويل الملف إلى Base64
+                file_bytes = uploaded_file.read()
+                encoded_pdf = base64.b64encode(file_bytes).decode("utf-8")
+
+                # طلب الاستخراج من Mistral
+                st.write("🔄 يتم الآن قراءة النص بالذكاء الاصطناعي...")
+                ocr_response = client.ocr.process(
+                    model="mistral-ocr-latest",
+                    document={
+                        "type": "document_url",
+                        "document_url": f"data:application/pdf;base64,{encoded_pdf}"
+                    }
+                )
+
+                # تنظيف وتنسيق النص
+                st.write("🧹 جاري تنظيف وتنسيق النص العربي...")
+                full_text = clean_and_format_text(ocr_response.pages)
+               
+                # إنشاء ملف الوورد
+                word_data = create_word_file(full_text)
+                if final_text:
+              # نقوم باستدعاء الدالة وحفظ النتيجة في متغير
+                 doc_download = create_word_file(final_text)
+    
+               # نظهر الزر للمستخدم
+                 st.download_button(
+        label="📥 تحميل النص كملف Word",
+        data=doc_download,
+        file_name="mistral_ocr_result.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                                                                      )
             st.success("تمت العملية بنجاح! 🎉")
 
             # عرض النص في التطبيق للمعاينة
@@ -89,7 +107,7 @@ if uploaded_file is not None:
                     mime="text/plain"
                 )
 
-              except Exception as e:
+        except Exception as e:
             st.error(f"حدث خطأ: {e}")
-          else:
+else:
     st.info("يرجى إدخال مفتاح API ورفع ملف للبدء.")
