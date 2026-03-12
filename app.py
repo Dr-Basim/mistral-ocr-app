@@ -90,6 +90,6 @@ if uploaded_file is not None:
                 )
 
               except Exception as e:
-            st.error(f"حدث خطأ: {e}")
-          else:
+      st.error(f"حدث خطأ: {e}")
+     else:
     st.info("يرجى إدخال مفتاح API ورفع ملف للبدء.")
