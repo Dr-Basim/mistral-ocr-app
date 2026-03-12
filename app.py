@@ -10,10 +10,11 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 def clean_and_format_text(ocr_pages):
     final_text = ""
     for i, page in enumerate(ocr_pages):
+        # استخراج النص من خاصية markdown المتوفرة في استجابة ميسترال
         text = page.markdown
         # إزالة المسافات الزائدة (أكثر من مسافتين)
         text = re.sub(r'\s{2,}', ' ', text)
-        # إضافة فاصل صفحات واضح
+        # إضافة فاصل صفحات واضح لترتيب المستند
         page_header = f"\n\n--- صفحة {i+1} ---\n\n"
         final_text += page_header + text
     return final_text
@@ -21,15 +22,16 @@ def clean_and_format_text(ocr_pages):
 # --- 2. دالة إنشاء ملف الوورد ---
 def create_word_file(text):
     doc = Document()
-    # إعداد المستند ليدعم الكتابة من اليمين لليسار
+    # إعداد النمط الافتراضي ليدعم اللغة العربية
     style = doc.styles['Normal']
     style.font.name = 'Arial'
 
     for line in text.split('\n'):
-        p = doc.add_paragraph(line)
-        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT  # محاذاة لليمين
-
-    # حفظ الملف في ذاكرة مؤقتة (Buffer) لتحميله عبر المتصفح
+        if line.strip(): # تجنب إضافة أسطر فارغة بلا داعي
+            p = doc.add_paragraph(line)
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT  # محاذاة النص لليمين
+    
+    # حفظ الملف في ذاكرة مؤقتة (Buffer)
     bio = io.BytesIO()
     doc.save(bio)
     return bio.getvalue()
@@ -38,28 +40,30 @@ def create_word_file(text):
 st.set_page_config(page_title="معالج الكتب الذكي", page_icon="📚")
 st.title("معالج الكتب العربي الذكي 🤖📖")
 
-with st.sidebar:
-    st.header("الإعدادات")
-    # إحضار المفتاح من الخزنة السرية
-api_key = st.secrets["MISTRAL_API_KEY"]
+# جلب المفتاح من الخزنة السرية (Secrets) الخاصة بـ Streamlit
+try:
+    api_key = st.secrets["MISTRAL_API_KEY"]
+except Exception:
+    api_key = None
+    st.error("لم يتم العثور على مفتاح MISTRAL_API_KEY في الإعدادات.")
 
-# تعريف العميل باستخدام المفتاح
-client = Mistral(api_key=api_key)
+# تعريف العميل (Client)
+if api_key:
+    client = Mistral(api_key=api_key)
 
 uploaded_file = st.file_uploader("اختر ملف PDF", type=["pdf"])
 
 if uploaded_file and api_key:
     if st.button("ابدأ عملية الاستخراج والتنسيق ✨"):
         try:
-            client = Mistral(api_key=api_key)
-
             with st.status("جاري معالجة الكتاب..."):
-                # تحويل الملف إلى Base64
+                # تحويل الملف المرفوع إلى Base64 ليتم إرساله عبر الرابط الافتراضي (Data URL)
                 file_bytes = uploaded_file.read()
                 encoded_pdf = base64.b64encode(file_bytes).decode("utf-8")
 
-                # طلب الاستخراج من Mistral
-                st.write("🔄 يتم الآن قراءة النص بالذكاء الاصطناعي...")
+                st.write("🔄 يتم الآن قراءة النص بالذكاء الاصطناعي عبر Mistral OCR...")
+                
+                # استدعاء الـ API باستخدام الهيكل الصحيح للإصدارات الحديثة
                 ocr_response = client.ocr.process(
                     model="mistral-ocr-latest",
                     document={
@@ -68,30 +72,19 @@ if uploaded_file and api_key:
                     }
                 )
 
-                # تنظيف وتنسيق النص
-                st.write("🧹 جاري تنظيف وتنسيق النص العربي...")
+                st.write("🧹 جاري تنظيف وتنسيق النص العربي المستخرج...")
                 full_text = clean_and_format_text(ocr_response.pages)
-
-                # إنشاء ملف الوورد
+                
+                # تحويل النص النهائي إلى بيانات ملف Word
                 word_data = create_word_file(full_text)
 
-                # الإضافة الجديدة في موضعها الصحيح
-                st.text_area("النص المستخرج:", full_text, height=300)
+            # --- عرض النتائج وأزرار التحميل ---
+            st.success("تمت المعالجة بنجاح! 🎉")
+            
+            # معاينة النص في منطقة نصية قابلة للنسخ
+            st.text_area("معاينة النص المستخرج:", full_text, height=400)
 
-                if full_text.strip():
-                    st.download_button(
-                        label="📥 تحميل النص كملف Word",
-                        data=word_data,
-                        file_name="mistral_ocr_result.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-
-            st.success("تمت العملية بنجاح! 🎉")
-
-            # عرض النص في التطبيق للمعاينة
-            st.text_area("معاينة النص المستخرج:", full_text, height=300)
-
-            # أزرار التحميل
+            # توزيع أزرار التحميل في أعمدة لتنظيم الواجهة
             col1, col2 = st.columns(2)
             with col1:
                 st.download_button(
@@ -109,6 +102,10 @@ if uploaded_file and api_key:
                 )
 
         except Exception as e:
-            st.error(f"حدث خطأ: {e}")
+            st.error(f"حدث خطأ أثناء الاتصال بالخادم: {e}")
+            st.info("تأكد من تحديث مكتبة mistralai في ملف requirements.txt إلى الإصدار 1.4.0 أو أحدث.")
 else:
-    st.info("يرجى إدخال مفتاح API ورفع ملف للبدء.")
+    if not api_key:
+        st.warning("يرجى التأكد من إضافة مفتاح API في خزنة الأسرار.")
+    else:
+        st.info("يرجى رفع ملف PDF للبدء في الاستخراج.")
